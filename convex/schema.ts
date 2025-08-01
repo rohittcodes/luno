@@ -19,6 +19,7 @@ export default defineSchema({
     id: v.string(),
     name: v.string(),
     ownerId: v.string(),
+    createdBy: v.string(),
     description: v.optional(v.string()),
     logoUrl: v.optional(v.string()),
     createdAt: v.number(),
@@ -39,6 +40,44 @@ export default defineSchema({
   })
   .index("by_organization_id", ["organizationId"])
   .index("by_user_id", ["userId"]),
+
+  // Organization invitations
+  invitations: defineTable({
+    id: v.string(),
+    organizationId: v.string(),
+    email: v.string(),
+    role: v.union(
+      v.literal("admin"),
+      v.literal("member"),
+      v.literal("viewer")
+    ),
+    invitedBy: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("revoked")
+    ),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  })
+  .index("by_organization_id", ["organizationId"])
+  .index("by_email", ["email"]),
+
+  // Organization domains
+  domains: defineTable({
+    id: v.string(),
+    organizationId: v.string(),
+    domain: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("verified"),
+      v.literal("failed")
+    ),
+    verifiedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+  .index("by_organization_id", ["organizationId"])
+  .index("by_domain", ["domain"]),
 
   // Role assignments per event (flexible access)
   eventRoles: defineTable({
@@ -70,25 +109,38 @@ export default defineSchema({
   events: defineTable({
     title: v.string(),
     description: v.optional(v.string()),
-    organizerId: v.string(),
-    startTime: v.number(),
-    endTime: v.number(),
+    startDate: v.number(),
+    endDate: v.number(),
     location: v.optional(v.string()),
-    virtual: v.boolean(),
-    branding: v.optional(v.object({
-      logoUrl: v.optional(v.string()),
-      themeColor: v.optional(v.string()),
-    })),
-    agenda: v.array(v.object({
-      title: v.string(),
-      description: v.optional(v.string()),
-      startTime: v.number(),
-      endTime: v.number(),
-      sessionId: v.optional(v.string()),
-    })),
+    organizerId: v.string(),
+    organizationId: v.string(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("published"),
+      v.literal("cancelled")
+    ),
+    maxAttendees: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }),
+  })
+  .index("by_organization_id", ["organizationId"])
+  .index("by_organizer_id", ["organizerId"])
+  .index("by_status", ["status"]),
+
+  // Event registrations
+  registrations: defineTable({
+    eventId: v.string(),
+    userId: v.string(),
+    status: v.union(
+      v.literal("registered"),
+      v.literal("attended"),
+      v.literal("cancelled")
+    ),
+    registeredAt: v.number(),
+    attendedAt: v.optional(v.number()),
+  })
+  .index("by_event_id", ["eventId"])
+  .index("by_user_id", ["userId"]),
 
   // Sessions inside events
   sessions: defineTable({

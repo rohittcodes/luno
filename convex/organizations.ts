@@ -6,6 +6,7 @@ export const syncOrganization = mutation({
         id: v.string(),
         name: v.string(),
         ownerId: v.string(),
+        createdBy: v.string(),
         createdAt: v.number(),
         updatedAt: v.number(),
     },

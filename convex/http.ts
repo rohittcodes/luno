@@ -45,6 +45,7 @@ http.route({
                     id: org.id,
                     name: org.name,
                     ownerId: org.created_by ?? '',
+                    createdBy: org.created_by ?? '',
                     createdAt: org.created_at,
                     updatedAt: org.updated_at,
                 });
@@ -77,6 +78,118 @@ http.route({
             } catch (error) {
                 console.error("Error deleting organization", error);
                 return new Response("Error deleting organization", { status: 500 });
+            }
+        }
+
+        // Handle membership events
+        if (event.type === "organizationMembership.created") {
+            const membership = event.data;
+            try {
+                // Map Clerk roles to our schema roles
+                const roleMap: Record<string, "admin" | "member" | "viewer"> = {
+                    "org:admin": "admin",
+                    "org:member": "member", 
+                    "org:viewer": "viewer",
+                    "admin": "admin",
+                    "member": "member",
+                    "viewer": "viewer"
+                };
+                
+                const mappedRole = roleMap[membership.role] || "member";
+                
+                await ctx.runMutation(api.memberships.addMember, {
+                    organizationId: membership.organization.id,
+                    userId: membership.public_user_data.user_id,
+                    role: mappedRole,
+                    invitedBy: membership.created_at?.toString() || '',
+                });
+            } catch (error) {
+                // If user is already a member, that's fine - just log it
+                if (error instanceof Error && error.message?.includes("already a member")) {
+                    console.log("User already a member, skipping duplicate creation");
+                } else {
+                    console.error("Error syncing membership", error);
+                    return new Response("Error syncing membership", { status: 500 });
+                }
+            }
+        }
+
+        if (event.type === "organizationMembership.updated") {
+            const membership = event.data;
+            try {
+                // Map Clerk roles to our schema roles
+                const roleMap: Record<string, "admin" | "member" | "viewer"> = {
+                    "org:admin": "admin",
+                    "org:member": "member", 
+                    "org:viewer": "viewer",
+                    "admin": "admin",
+                    "member": "member",
+                    "viewer": "viewer"
+                };
+                
+                const mappedRole = roleMap[membership.role] || "member";
+                
+                await ctx.runMutation(api.memberships.updateMemberRole, {
+                    organizationId: membership.organization.id,
+                    userId: membership.public_user_data.user_id,
+                    role: mappedRole,
+                });
+            } catch (error) {
+                console.error("Error updating membership", error);
+                return new Response("Error updating membership", { status: 500 });
+            }
+        }
+
+        if (event.type === "organizationMembership.deleted") {
+            const membership = event.data;
+            try {
+                await ctx.runMutation(api.memberships.removeMember, {
+                    organizationId: membership.organization.id,
+                    userId: membership.public_user_data.user_id,
+                });
+            } catch (error) {
+                console.error("Error removing membership", error);
+                return new Response("Error removing membership", { status: 500 });
+            }
+        }
+
+        // Handle invitation events
+        if (event.type === "organizationInvitation.created") {
+            const invitation = event.data;
+            try {
+                // Map Clerk roles to our schema roles
+                const roleMap: Record<string, "admin" | "member" | "viewer"> = {
+                    "org:admin": "admin",
+                    "org:member": "member", 
+                    "org:viewer": "viewer",
+                    "admin": "admin",
+                    "member": "member",
+                    "viewer": "viewer"
+                };
+                
+                const mappedRole = roleMap[invitation.role] || "member";
+                
+                await ctx.runMutation(api.invitations.createInvitation, {
+                    organizationId: invitation.organization_id,
+                    email: invitation.email_address,
+                    role: mappedRole,
+                    invitedBy: invitation.created_at?.toString() || '',
+                });
+            } catch (error) {
+                console.error("Error creating invitation", error);
+                return new Response("Error creating invitation", { status: 500 });
+            }
+        }
+
+        if (event.type === "organizationInvitation.revoked") {
+            const invitation = event.data;
+            try {
+                await ctx.runMutation(api.invitations.revokeInvitation, {
+                    invitationId: invitation.id,
+                });
+            } catch (error) {
+                console.error("Error revoking invitation", error);
+                return new Response("Error revoking invitation", { status: 500 });
             }
         }
 
