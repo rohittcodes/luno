@@ -15,6 +15,8 @@ import { format } from 'date-fns'
 import { CalendarIcon, Plus, Trash2, Edit, Search, Filter } from 'lucide-react'
 import { ExportButton } from './export-button'
 import { ListSkeleton } from '@/components/skeletons/list-skeleton'
+import { formatCurrencyClient, getLocaleFromCurrency } from '@/lib/utils/currency'
+import { toast } from 'sonner'
 import type { Database } from '@/types/database'
 
 type Transaction = Database['public']['Tables']['transactions']['Row'] & {
@@ -32,6 +34,8 @@ export default function TransactionsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense' | 'transfer'>('all')
+  const [userCurrency, setUserCurrency] = useState<string>('USD')
+  const [userLocale, setUserLocale] = useState<string>('en-US')
 
   useEffect(() => {
     loadData()
@@ -65,6 +69,24 @@ export default function TransactionsPage() {
 
       if (categoriesError) throw categoriesError
 
+      // Load user currency preference
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      
+      if (user) {
+        const { data: profileData } = await supabase
+          .from('users_profile')
+          .select('currency_preference')
+          .eq('id', user.id)
+          .single()
+
+        const currency = profileData?.currency_preference || 'USD'
+        const locale = getLocaleFromCurrency(currency)
+        setUserCurrency(currency)
+        setUserLocale(locale)
+      }
+
       setTransactions(transactionsData || [])
       setAccounts(accountsData || [])
       setCategories(categoriesData || [])
@@ -89,7 +111,7 @@ export default function TransactionsPage() {
       await loadData()
     } catch (error) {
       console.error('Error deleting transaction:', error)
-      alert('Failed to delete transaction')
+      toast.error('Failed to delete transaction')
     }
   }
 
@@ -137,10 +159,7 @@ export default function TransactionsPage() {
           <CardHeader className="pb-2">
             <CardDescription>Total Income</CardDescription>
             <CardTitle className="text-2xl text-green-600">
-              {new Intl.NumberFormat('en-IN', {
-                style: 'currency',
-                currency: 'INR',
-              }).format(totalIncome)}
+              {formatCurrencyClient(totalIncome, userCurrency, userLocale)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -148,10 +167,7 @@ export default function TransactionsPage() {
           <CardHeader className="pb-2">
             <CardDescription>Total Expenses</CardDescription>
             <CardTitle className="text-2xl text-red-600">
-              {new Intl.NumberFormat('en-IN', {
-                style: 'currency',
-                currency: 'INR',
-              }).format(totalExpenses)}
+              {formatCurrencyClient(totalExpenses, userCurrency, userLocale)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -159,10 +175,7 @@ export default function TransactionsPage() {
           <CardHeader className="pb-2">
             <CardDescription>Net</CardDescription>
             <CardTitle className={`text-2xl ${totalIncome - totalExpenses >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {new Intl.NumberFormat('en-IN', {
-                style: 'currency',
-                currency: 'INR',
-              }).format(totalIncome - totalExpenses)}
+              {formatCurrencyClient(totalIncome - totalExpenses, userCurrency, userLocale)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -217,14 +230,16 @@ export default function TransactionsPage() {
       ) : (
         <div className="space-y-2">
           {filteredTransactions.map((transaction) => (
-            <TransactionCard
-              key={transaction.id}
-              transaction={transaction}
-              onDelete={handleDelete}
-              onEdit={() => {
-                setEditingId(transaction.id)
-                setIsDialogOpen(true)
-              }}
+              <TransactionCard
+                key={transaction.id}
+                transaction={transaction}
+                userCurrency={userCurrency}
+                userLocale={userLocale}
+                onDelete={handleDelete}
+                onEdit={() => {
+                  setEditingId(transaction.id)
+                  setIsDialogOpen(true)
+                }}
             />
           ))}
         </div>
@@ -235,10 +250,14 @@ export default function TransactionsPage() {
 
 function TransactionCard({
   transaction,
+  userCurrency,
+  userLocale,
   onDelete,
   onEdit,
 }: {
   transaction: Transaction & { accounts?: Account; categories?: Category }
+  userCurrency: string
+  userLocale: string
   onDelete: (id: string) => void
   onEdit: () => void
 }) {
@@ -280,10 +299,11 @@ function TransactionCard({
               'text-gray-600'
             }`}>
               {transaction.type === 'expense' ? '-' : transaction.type === 'income' ? '+' : ''}
-              {new Intl.NumberFormat('en-IN', {
-                style: 'currency',
-                currency: transaction.currency || 'INR',
-              }).format(Math.abs(Number(transaction.amount)))}
+              {formatCurrencyClient(
+                Math.abs(Number(transaction.amount)),
+                transaction.currency || userCurrency,
+                transaction.currency ? getLocaleFromCurrency(transaction.currency) : userLocale
+              )}
             </p>
             <div className="flex gap-2 mt-2">
               <Button variant="outline" size="sm" onClick={onEdit}>
@@ -326,14 +346,39 @@ function TransactionDialog({
     description: '',
     type: 'expense' as 'income' | 'expense' | 'transfer',
     amount: '',
-    currency: 'INR',
+    currency: 'USD', // Will be updated when userCurrency is loaded
     account_id: '',
     category_id: '',
     transaction_date: new Date(),
     notes: '',
   })
+  
+  const [userCurrency, setUserCurrency] = useState<string>('USD')
 
   const supabase = createClientBrowser()
+
+  useEffect(() => {
+    async function loadUserCurrency() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      
+      if (user) {
+        const { data: profileData } = await supabase
+          .from('users_profile')
+          .select('currency_preference')
+          .eq('id', user.id)
+          .single()
+
+        const currency = profileData?.currency_preference || 'USD'
+        setUserCurrency(currency)
+      }
+    }
+
+    if (open) {
+      loadUserCurrency()
+    }
+  }, [open])
 
   useEffect(() => {
     if (editingId && open) {
@@ -357,7 +402,7 @@ function TransactionDialog({
           description: data.description || '',
           type: data.type as 'income' | 'expense' | 'transfer',
           amount: data.amount?.toString() || '',
-          currency: data.currency || 'INR',
+          currency: data.currency || userCurrency,
           account_id: data.account_id || '',
           category_id: data.category_id || '',
           transaction_date: new Date(data.transaction_date),
@@ -374,7 +419,7 @@ function TransactionDialog({
       description: '',
       type: 'expense',
       amount: '',
-      currency: 'INR',
+      currency: userCurrency,
       account_id: accounts[0]?.id || '',
       category_id: '',
       transaction_date: new Date(),
@@ -398,7 +443,7 @@ function TransactionDialog({
         const limitResponse = await fetch(`/api/check-limits?feature=transactions`)
         const limitData = await limitResponse.json()
         if (!limitData.canUse) {
-          alert(`Transaction limit reached (${limitData.current}/${limitData.limit === 'unlimited' ? '∞' : limitData.limit}). Please upgrade to add more transactions.`)
+          toast.error(`Transaction limit reached (${limitData.current}/${limitData.limit === 'unlimited' ? '∞' : limitData.limit}). Please upgrade to add more transactions.`)
           setLoading(false)
           return
         }
@@ -437,7 +482,7 @@ function TransactionDialog({
       resetForm()
     } catch (error: any) {
       console.error('Error saving transaction:', error)
-      alert(error.message || 'Failed to save transaction')
+      toast.error(error.message || 'Failed to save transaction')
     } finally {
       setLoading(false)
     }

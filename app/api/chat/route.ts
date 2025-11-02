@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { streamText, tool } from 'ai'
+import { streamText, tool, convertToModelMessages, stepCountIs } from 'ai'
 import { google } from '@ai-sdk/google'
 import { openai } from '@ai-sdk/openai'
 import { createClient } from '@/lib/supabase/server'
@@ -19,11 +19,16 @@ export const maxDuration = 60 // 60 seconds for complex multi-step operations
  */
 export async function POST(req: Request) {
   try {
-    const { messages, modelId, provider } = await req.json()
+    const body = await req.json()
+    const { messages, modelId, provider } = body
 
     if (!messages || !Array.isArray(messages)) {
       return new Response('Invalid request: messages array required', { status: 400 })
     }
+
+    // Convert UIMessages to ModelMessages for streamText
+    // useChat sends UIMessage[] format (with parts), but streamText needs ModelMessage[] format (with content)
+    const modelMessages = convertToModelMessages(messages)
 
     // Get authenticated user
     const supabase = await createClient()
@@ -40,50 +45,50 @@ export async function POST(req: Request) {
     const selectedModelId = (modelId as string) || 'gemini-2.5-flash-lite'
 
     // Build database tools
-    const dbTools: Record<string, ReturnType<typeof tool>> = {}
+    const dbTools: Record<string, any> = {}
     for (const [name, toolDef] of Object.entries(databaseTools)) {
       dbTools[name] = tool({
         description: toolDef.description,
         parameters: toolDef.parameters as any,
-        execute: toolDef.execute,
-      })
+        execute: toolDef.execute as any,
+      } as any)
     }
-
     // Initialize Tool Router MCP client (for external integrations)
-    const toolRouterTools: Record<string, ReturnType<typeof tool>> = {}
+    let mcpClient: Awaited<ReturnType<typeof createToolRouterMCPClient>> | null = null
+    const toolRouterTools: Record<string, any> = {}
+
     try {
-      const mcpClient = await createToolRouterMCPClient(user.id)
-      
+      console.log('[MCP] Creating Tool Router MCP client for user:', user.id)
+      mcpClient = await createToolRouterMCPClient(user.id)
+
       if (mcpClient) {
-        // List available tools from Tool Router
-        const availableTools = await mcpClient.listTools()
-        
-        // Convert MCP tools to AI SDK tool format
-        for (const mcpTool of availableTools.tools || []) {
-          const toolName = `toolRouter_${mcpTool.name || 'tool'}`
-          toolRouterTools[toolName] = tool({
-            description: mcpTool.description || '',
-            parameters: mcpTool.inputSchema || {},
-            execute: async (params: any) => {
-              const result = await mcpClient.callTool({
-                name: mcpTool.name,
-                arguments: params,
-              })
-              return result.content?.[0]?.text || result.content?.[0]?.data || result
-            },
-          })
+        console.log('[MCP] Client created successfully, fetching tools...')
+        // Get tools from MCP client (following docs pattern)
+        const mcpToolSet = await mcpClient.tools()
+        console.log('[MCP] Tools fetched:', Object.keys(mcpToolSet).length, 'tools')
+
+        // MCP tools are already in AI SDK format when returned from client.tools()
+        // Combine with existing tools (following docs pattern)
+        for (const [toolName, mcpTool] of Object.entries(mcpToolSet)) {
+          toolRouterTools[`toolRouter_${toolName}`] = mcpTool
         }
+        console.log('[MCP] Tool Router tools loaded:', Object.keys(toolRouterTools).length)
+      } else {
+        console.warn('[MCP] MCP client is null')
       }
     } catch (error) {
-      console.warn('Tool Router MCP client not available:', error)
       // Continue without Tool Router tools if unavailable
+      console.error('[MCP] Failed to load Tool Router tools:', error)
+      if (error instanceof Error) {
+        console.error('[MCP] Error details:', error.message, error.stack)
+      }
     }
 
-    // Combine all tools
+    // Combine all tools (following docs pattern)
     const allTools = {
       ...dbTools,
       ...toolRouterTools,
-    }
+    } as any
 
     // System prompt for the financial assistant
     const systemPrompt = `You are Luno, an AI financial assistant helping users manage their finances.
@@ -148,18 +153,43 @@ Remember: You can perform complex multi-step operations. For example:
       model = google(modelName)
     }
 
-    // Stream response with selected model
+    // Stream response with proper cleanup (following docs pattern)
+    // Use stopWhen: stepCountIs() for multi-step tool calling (as per AI SDK docs)
     const result = await streamText({
       model,
       system: systemPrompt,
-      messages,
+      messages: modelMessages,
       tools: allTools,
-      maxSteps: 10, // Allow up to 10 tool calls for complex multi-step operations
+      stopWhen: stepCountIs(10), // Allow up to 10 steps for complex multi-step operations (e.g., search tools -> manage connections -> execute tools)
       temperature: 0.7,
-      maxTokens: 2000,
-    })
+      // Log tool calls for debugging
+      onToolCall: ({ toolCallId, toolName, args }: { toolCallId: string; toolName: string; args: unknown }) => {
+        console.log('[Tool] Tool called:', toolName, 'ID:', toolCallId, 'Args:', JSON.stringify(args).substring(0, 100))
+      },
+      // Log tool results
+      onToolResult: ({ toolCallId, toolName, result }: { toolCallId: string; toolName: string; result: unknown }) => {
+        console.log('[Tool] Tool result:', toolName, 'ID:', toolCallId, 'Result:', typeof result === 'string' ? result.substring(0, 100) : 'object')
+      },
+      // When streaming, the client should be closed after the response is finished:
+      onFinish: async () => {
+        console.log('[Tool] Stream finished, closing MCP client')
+        if (mcpClient) {
+          await mcpClient.close()
+        }
+      },
+      // Closing clients onError is optional but recommended
+      // - Closing: Immediately frees resources, prevents hanging connections
+      // - Not closing: Keeps connection open for retries
+      onError: async (error: unknown) => {
+        console.error('[Tool] Error during streaming:', error)
+        if (mcpClient) {
+          await mcpClient.close()
+        }
+      },
+    } as any) // maxSteps exists at runtime but may not be in TypeScript types for v5.0.86
 
-    return result.toDataStreamResponse()
+    console.log('[Stream] Returning UIMessage stream response')
+    return result.toUIMessageStreamResponse()
   } catch (error) {
     console.error('Chat API error:', error)
     return new Response(

@@ -1,12 +1,28 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Wallet, TrendingUp } from 'lucide-react'
+import { formatCurrencyForUser } from '@/lib/utils/currency-server'
+import { createClient } from '@/lib/supabase/server'
 import type { DashboardSummary } from '@/lib/data/dashboard-data'
 
 /**
  * Summary cards component (Server Component)
  */
-export function DashboardSummaryCards({ summary }: { summary: DashboardSummary }) {
+export async function DashboardSummaryCards({ summary }: { summary: DashboardSummary }) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return null
+  }
+
+  const currency = await formatCurrencyForUser(summary.accountBalance, user.id)
+  const incomeFormatted = await formatCurrencyForUser(summary.totalIncome, user.id)
+  const expensesFormatted = await formatCurrencyForUser(summary.totalExpenses, user.id)
+  
   const netAmount = summary.totalIncome - summary.totalExpenses
+  const netFormatted = await formatCurrencyForUser(netAmount, user.id)
 
   return (
     <div className="grid gap-4 md:grid-cols-4">
@@ -15,10 +31,7 @@ export function DashboardSummaryCards({ summary }: { summary: DashboardSummary }
           <CardDescription>Total Balance</CardDescription>
           <CardTitle className="text-2xl flex items-center gap-2">
             <Wallet className="h-5 w-5" />
-            {new Intl.NumberFormat('en-IN', {
-              style: 'currency',
-              currency: 'INR',
-            }).format(summary.accountBalance)}
+            {currency}
           </CardTitle>
         </CardHeader>
       </Card>
@@ -27,10 +40,7 @@ export function DashboardSummaryCards({ summary }: { summary: DashboardSummary }
           <CardDescription>This Month Income</CardDescription>
           <CardTitle className="text-2xl text-green-600 flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            {new Intl.NumberFormat('en-IN', {
-              style: 'currency',
-              currency: 'INR',
-            }).format(summary.totalIncome)}
+            {incomeFormatted}
           </CardTitle>
         </CardHeader>
       </Card>
@@ -39,10 +49,7 @@ export function DashboardSummaryCards({ summary }: { summary: DashboardSummary }
           <CardDescription>This Month Expenses</CardDescription>
           <CardTitle className="text-2xl text-red-600 flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            {new Intl.NumberFormat('en-IN', {
-              style: 'currency',
-              currency: 'INR',
-            }).format(summary.totalExpenses)}
+            {expensesFormatted}
           </CardTitle>
         </CardHeader>
       </Card>
@@ -55,10 +62,7 @@ export function DashboardSummaryCards({ summary }: { summary: DashboardSummary }
             }`}
           >
             <TrendingUp className={`h-5 w-5 ${netAmount < 0 ? 'rotate-180' : ''}`} />
-            {new Intl.NumberFormat('en-IN', {
-              style: 'currency',
-              currency: 'INR',
-            }).format(netAmount)}
+            {netFormatted}
           </CardTitle>
         </CardHeader>
       </Card>

@@ -27,6 +27,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
@@ -48,19 +49,45 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Transactions', href: '/transactions', icon: Receipt },
-  { name: 'Accounts', href: '/accounts', icon: Wallet },
-  { name: 'Categories', href: '/categories', icon: Tag },
-  { name: 'Budgets', href: '/budgets', icon: Target },
-  { name: 'Goals', href: '/goals', icon: TrendingUp },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-  { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
-  { name: 'Integrations', href: '/integrations', icon: Link2 },
-  { name: 'Family', href: '/family', icon: Users },
-  { name: 'Notifications', href: '/notifications', icon: Bell },
-  { name: 'Settings', href: '/settings/billing', icon: Settings },
+interface NavigationItem {
+  name: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+}
+
+interface NavigationGroup {
+  label: string
+  items: NavigationItem[]
+}
+
+const navigationGroups: NavigationGroup[] = [
+  {
+    label: 'Overview',
+    items: [
+      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { name: 'Transactions', href: '/transactions', icon: Receipt },
+      { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    ],
+  },
+  {
+    label: 'Management',
+    items: [
+      { name: 'Accounts', href: '/accounts', icon: Wallet },
+      { name: 'Categories', href: '/categories', icon: Tag },
+      { name: 'Budgets', href: '/budgets', icon: Target },
+      { name: 'Goals', href: '/goals', icon: TrendingUp },
+      { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
+    ],
+  },
+  {
+    label: 'Settings',
+    items: [
+      { name: 'Integrations', href: '/integrations', icon: Link2 },
+      { name: 'Family', href: '/family', icon: Users },
+      { name: 'Notifications', href: '/notifications', icon: Bell },
+      { name: 'Settings', href: '/settings', icon: Settings },
+    ],
+  },
 ]
 
 export function DashboardNav() {
@@ -81,30 +108,36 @@ export function DashboardNav() {
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-2">
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navigation.map((item) => {
-                const isActive =
-                  pathname === item.href || pathname?.startsWith(item.href + '/')
-                return (
-                  <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      tooltip={item.name}
-                    >
-                      <Link href={item.href}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.name}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {navigationGroups.map((group, groupIndex) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const isActive =
+                    pathname === item.href || pathname?.startsWith(item.href + '/')
+                  return (
+                    <SidebarMenuItem key={item.name}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.name}
+                      >
+                        <Link href={item.href}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+            {groupIndex < navigationGroups.length - 1 && (
+              <SidebarSeparator className="my-0 mt-4 mx-0 mr-2" />
+            )}
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter className="px-2 py-2 border-t">
@@ -235,7 +268,7 @@ function UserMenu() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/settings/billing" className="cursor-pointer">
+              <Link href="/settings" className="cursor-pointer">
                 <User className="mr-2 h-4 w-4" />
                 Profile Settings
               </Link>

@@ -1,6 +1,7 @@
 import { Composio } from '@composio/core'
 import { OpenAIAgentsProvider } from '@composio/openai-agents'
 import { createClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/utils/logger'
 
 /**
  * Create Tool Router client
@@ -9,7 +10,9 @@ export function createToolRouterClient() {
   const apiKey = process.env.COMPOSIO_API_KEY
 
   if (!apiKey) {
-    throw new Error('COMPOSIO_API_KEY environment variable is required')
+    const errorMsg = 'COMPOSIO_API_KEY environment variable is not set. Please add it to your .env.local file. Get your API key from https://app.composio.dev/settings'
+    logger.error(errorMsg)
+    throw new Error(errorMsg)
   }
 
   return new Composio({
@@ -35,22 +38,49 @@ export async function createToolRouterSession(
       { toolkits }
     )
 
+    // Type assertion for Composio session response
+    // Composio may return different field names depending on version
+    const sessionResponse = session as any
+
+    // Log the session response to debug
+    logger.debug('Composio session response:', {
+      hasUrl: !!sessionResponse.url,
+      hasChatSessionMcpUrl: !!sessionResponse.chat_session_mcp_url,
+      hasToolRouterInstanceMcpUrl: !!sessionResponse.tool_router_instance_mcp_url,
+      hasSessionId: !!sessionResponse.session_id,
+      sessionKeys: Object.keys(sessionResponse),
+    })
+
+    const sessionUrl = sessionResponse.url || sessionResponse.chat_session_mcp_url || sessionResponse.tool_router_instance_mcp_url
+    const composioSessionId = sessionResponse.session_id || sessionResponse.sessionId || null
+
     // Store session in database
-    await supabase.from('tool_router_sessions').insert({
-      user_id: userId,
-      session_url: session.url || session.chat_session_mcp_url || session.tool_router_instance_mcp_url,
-      session_id: session.session_id,
-      toolkits: toolkits,
-      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour
-      is_active: true,
-    } as any)
+    const { data, error } = await supabase
+      .from('tool_router_sessions')
+      .insert({
+        user_id: userId,
+        session_url: sessionUrl,
+        session_id: composioSessionId,
+        toolkits: toolkits,
+        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour
+        is_active: true,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      logger.error('Error storing session in database:', error)
+      throw error
+    }
+
+    logger.debug('Session stored in database:', { id: data.id, sessionId: data.session_id })
 
     return {
-      url: session.url || session.chat_session_mcp_url || session.tool_router_instance_mcp_url,
-      sessionId: session.session_id,
+      url: sessionUrl,
+      sessionId: composioSessionId,
     }
   } catch (error) {
-    console.error('Error creating Tool Router session:', error)
+    logger.error('Error creating Tool Router session:', error)
     throw error
   }
 }

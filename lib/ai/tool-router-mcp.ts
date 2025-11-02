@@ -1,61 +1,49 @@
 import 'server-only'
 
-import { createToolRouterSession, getActiveSession } from '@/lib/tool-router/client'
+import { experimental_createMCPClient } from '@ai-sdk/mcp'
+import { createToolRouterSession } from '@/lib/tool-router/client'
 import { createClient } from '@/lib/supabase/server'
-
-// Dynamic imports for experimental MCP features
-// These may not be available in all AI SDK versions
-async function getMCPImports() {
-  try {
-    const [aiModule, mcpModule] = await Promise.all([
-      import('ai'),
-      import('@modelcontextprotocol/sdk/client/streamableHTTP.js'),
-    ])
-    
-    return {
-      experimental_createMCPClient: (aiModule as any).experimental_createMCPClient,
-      StreamableHTTPClientTransport: mcpModule.StreamableHTTPClientTransport,
-    }
-  } catch (error) {
-    console.warn('MCP client imports not available:', error)
-    return { experimental_createMCPClient: null, StreamableHTTPClientTransport: null }
-  }
-}
 
 /**
  * Create MCP client for Composio Tool Router
  * Tool Router provides access to 500+ external integrations (Gmail, GitHub, Slack, banks, etc.)
  * 
- * Note: Uses experimental AI SDK feature. Falls back gracefully if unavailable.
+ * Tool Router uses Streamable HTTP transport for MCP communication.
+ * Following the pattern from AI SDK documentation for MCP tools with HTTP transport.
  */
 export async function createToolRouterMCPClient(userId: string) {
+  // Get or create Tool Router session
+  const session = await getOrCreateToolRouterSession(userId)
+  
+  console.log('[MCP] Creating client with URL:', session.url.substring(0, 50) + '...')
+  console.log('[MCP] Session ID:', session.sessionId ? 'present' : 'missing')
+
   try {
-    // Get MCP imports dynamically
-    const { experimental_createMCPClient, StreamableHTTPClientTransport } = await getMCPImports()
-    
-    if (!experimental_createMCPClient || !StreamableHTTPClientTransport) {
-      console.warn('MCP client not available in this AI SDK version')
-      return null
-    }
-
-    // Create or get Tool Router session
-    const session = await getOrCreateToolRouterSession(userId)
-
-    // Create MCP client with StreamableHTTP transport
-    // The URL should be a string or URL object
-    const transportUrl = typeof session.url === 'string' ? new URL(session.url) : session.url
-    const client = experimental_createMCPClient({
-      name: 'tool_router',
-      transport: new StreamableHTTPClientTransport({
-        url: transportUrl,
-      } as any), // Type assertion for experimental API
+    // Create MCP client with HTTP transport (Streamable HTTP)
+    // Tool Router docs specify: "Tool Router uses Streamable HTTP transport for MCP communication"
+    // Following docs pattern: https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling
+    const mcpClient = await experimental_createMCPClient({
+      transport: {
+        type: 'http',
+        url: session.url,
+        // Optional: configure headers for session ID
+        headers: session.sessionId
+          ? {
+              'X-Session-Id': session.sessionId,
+            }
+          : undefined,
+      },
     })
 
-    return client
+    console.log('[MCP] Client created successfully')
+    return mcpClient
   } catch (error) {
-    console.error('Error creating Tool Router MCP client:', error)
-    // Don't throw - allow chat to work without Tool Router
-    return null
+    console.error('[MCP] Error creating MCP client:', error)
+    if (error instanceof Error) {
+      console.error('[MCP] Error message:', error.message)
+      console.error('[MCP] Error stack:', error.stack)
+    }
+    throw error
   }
 }
 
@@ -79,7 +67,7 @@ export async function getOrCreateToolRouterSession(userId: string) {
   if (existingSession?.session_url) {
     return {
       url: existingSession.session_url,
-      sessionId: existingSession.id,
+      sessionId: existingSession.session_id, // Use Composio session ID, not database ID
     }
   }
 

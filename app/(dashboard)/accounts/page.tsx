@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, Trash2, Edit, Wallet } from 'lucide-react'
+import { formatCurrencyClient, getLocaleFromCurrency } from '@/lib/utils/currency'
+import { toast } from 'sonner'
 import type { Database } from '@/types/database'
 import { ListSkeleton } from '@/components/skeletons/list-skeleton'
 
@@ -24,6 +26,8 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [userCurrency, setUserCurrency] = useState<string>('USD')
+  const [userLocale, setUserLocale] = useState<string>('en-US')
 
   useEffect(() => {
     loadAccounts()
@@ -38,6 +42,25 @@ export default function AccountsPage() {
         .order('name')
 
       if (error) throw error
+      
+      // Load user currency preference
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      
+      if (user) {
+        const { data: profileData } = await supabase
+          .from('users_profile')
+          .select('currency_preference')
+          .eq('id', user.id)
+          .single()
+
+        const currency = profileData?.currency_preference || 'USD'
+        const locale = getLocaleFromCurrency(currency)
+        setUserCurrency(currency)
+        setUserLocale(locale)
+      }
+
       setAccounts((data || []) as Account[])
     } catch (error) {
       console.error('Error loading accounts:', error)
@@ -60,7 +83,7 @@ export default function AccountsPage() {
       await loadAccounts()
     } catch (error) {
       console.error('Error deleting account:', error)
-      alert('Failed to delete account')
+      toast.error('Failed to delete account')
     }
   }
 
@@ -91,10 +114,7 @@ export default function AccountsPage() {
         <CardHeader>
           <CardDescription>Total Balance Across All Accounts</CardDescription>
           <CardTitle className="text-3xl">
-            {new Intl.NumberFormat('en-IN', {
-              style: 'currency',
-              currency: 'INR',
-            }).format(totalBalance)}
+            {formatCurrencyClient(totalBalance, userCurrency, userLocale)}
           </CardTitle>
         </CardHeader>
       </Card>
@@ -121,6 +141,8 @@ export default function AccountsPage() {
             <AccountCard
               key={account.id}
               account={account}
+              userCurrency={userCurrency}
+              userLocale={userLocale}
               onDelete={handleDelete}
               onEdit={() => {
                 setEditingId(account.id)
@@ -136,10 +158,14 @@ export default function AccountsPage() {
 
 function AccountCard({
   account,
+  userCurrency,
+  userLocale,
   onDelete,
   onEdit,
 }: {
   account: Account
+  userCurrency: string
+  userLocale: string
   onDelete: (id: string) => void
   onEdit: () => void
 }) {
@@ -170,10 +196,11 @@ function AccountCard({
       <CardContent>
         <div className="space-y-2">
           <div className="text-2xl font-bold">
-            {new Intl.NumberFormat('en-IN', {
-              style: 'currency',
-              currency: account.currency || 'INR',
-            }).format(Number(account.balance || 0))}
+            {formatCurrencyClient(
+              Number(account.balance || 0),
+              account.currency || userCurrency,
+              account.currency ? getLocaleFromCurrency(account.currency) : userLocale
+            )}
           </div>
           {account.account_number && (
             <p className="text-sm text-muted-foreground">
@@ -221,13 +248,38 @@ function AccountDialog({
     name: '',
     type: 'checking' as 'checking' | 'savings' | 'credit' | 'cash' | 'investment',
     balance: '',
-    currency: 'INR',
+    currency: 'USD',
     account_number: '',
     institution_name: '',
     notes: '',
   })
+  
+  const [userCurrency, setUserCurrency] = useState<string>('USD')
 
   const supabase = createClientBrowser()
+
+  useEffect(() => {
+    async function loadUserCurrency() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      
+      if (user) {
+        const { data: profileData } = await supabase
+          .from('users_profile')
+          .select('currency_preference')
+          .eq('id', user.id)
+          .single()
+
+        const currency = profileData?.currency_preference || 'USD'
+        setUserCurrency(currency)
+      }
+    }
+
+    if (open) {
+      loadUserCurrency()
+    }
+  }, [open])
 
   useEffect(() => {
     if (editingId && open) {
@@ -252,7 +304,7 @@ function AccountDialog({
           name: account.name,
           type: account.type as any,
           balance: account.balance?.toString() || '0',
-          currency: account.currency || 'INR',
+          currency: account.currency || userCurrency,
           account_number: account.account_number || '',
           institution_name: account.institution_name || '',
           notes: account.notes || '',
@@ -268,7 +320,7 @@ function AccountDialog({
       name: '',
       type: 'checking',
       balance: '0',
-      currency: 'INR',
+      currency: userCurrency,
       account_number: '',
       institution_name: '',
       notes: '',
@@ -320,7 +372,7 @@ function AccountDialog({
       resetForm()
     } catch (error: any) {
       console.error('Error saving account:', error)
-      alert(error.message || 'Failed to save account')
+      toast.error(error.message || 'Failed to save account')
     } finally {
       setLoading(false)
     }

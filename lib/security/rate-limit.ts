@@ -1,3 +1,7 @@
+import 'server-only'
+import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/utils/logger'
+
 /**
  * Simple in-memory rate limiting for API routes
  * For production, consider using Redis or a dedicated service
@@ -44,6 +48,7 @@ export function checkRateLimit(
 
   // Check if limit exceeded
   if (record.count >= limit) {
+    logger.warn(`Rate limit exceeded for identifier: ${identifier}`)
     return {
       allowed: false,
       remaining: 0,
@@ -83,5 +88,49 @@ export function cleanupRateLimits(): void {
 // Cleanup every 5 minutes
 if (typeof setInterval !== 'undefined') {
   setInterval(cleanupRateLimits, 5 * 60 * 1000)
+}
+
+/**
+ * Rate limit middleware for Next.js API routes
+ * @example
+ * ```ts
+ * export async function POST(request: NextRequest) {
+ *   const rateLimitResult = await rateLimitMiddleware(request)
+ *   if (rateLimitResult) return rateLimitResult
+ *   // ... handle request
+ * }
+ * ```
+ */
+export async function rateLimitMiddleware(
+  request: NextRequest,
+  limit: number = 100,
+  windowMs: number = 60 * 1000
+): Promise<NextResponse | null> {
+  const ip = request.headers.get('x-forwarded-for') ||
+             request.headers.get('x-real-ip') ||
+             'unknown'
+
+  const identifier = `${ip}:${request.nextUrl.pathname}`
+  const result = checkRateLimit(identifier, limit, windowMs)
+
+  if (!result.allowed) {
+    return NextResponse.json(
+      {
+        error: 'Too many requests. Please try again later.',
+        retryAfter: Math.ceil((result.resetAt - Date.now()) / 1000)
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(Math.ceil((result.resetAt - Date.now()) / 1000)),
+          'X-RateLimit-Limit': String(limit),
+          'X-RateLimit-Remaining': String(result.remaining),
+          'X-RateLimit-Reset': String(Math.ceil(result.resetAt / 1000))
+        }
+      }
+    )
+  }
+
+  return null
 }
 

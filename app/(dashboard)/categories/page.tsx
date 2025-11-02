@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Plus, Trash2, Edit, Folder, FolderTree } from 'lucide-react'
+import { toast } from 'sonner'
 import type { Database } from '@/types/database'
 import { ListSkeleton } from '@/components/skeletons/list-skeleton'
 
@@ -82,7 +83,7 @@ export default function CategoriesPage() {
       await loadCategories()
     } catch (error) {
       console.error('Error deleting category:', error)
-      alert('Failed to delete category')
+      toast.error('Failed to delete category')
     }
   }
 
@@ -299,7 +300,7 @@ function CategoryDialog({
         const limitResponse = await fetch(`/api/check-limits?feature=categories`)
         const limitData = await limitResponse.json()
         if (!limitData.canUse) {
-          alert(`Category limit reached (${limitData.current}/${limitData.limit === 'unlimited' ? '∞' : limitData.limit}). Please upgrade to create more categories.`)
+          toast.error(`Category limit reached (${limitData.current}/${limitData.limit === 'unlimited' ? '∞' : limitData.limit}). Please upgrade to create more categories.`)
           setLoading(false)
           return
         }
@@ -338,7 +339,7 @@ function CategoryDialog({
       resetForm()
     } catch (error: any) {
       console.error('Error saving category:', error)
-      alert(error.message || 'Failed to save category')
+      toast.error(error.message || 'Failed to save category')
     } finally {
       setLoading(false)
     }

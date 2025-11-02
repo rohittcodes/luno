@@ -3,6 +3,7 @@ import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { logger } from '@/lib/utils/logger'
 
 /**
  * API route helper utilities for security and validation
@@ -66,14 +67,14 @@ export function handleApiError(error: unknown): NextResponse {
     if (error.message.includes('Validation failed')) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
-    console.error('API error:', error)
+    logger.error('API error:', error.message)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     )
   }
 
-  console.error('Unknown error:', error)
+  logger.error('Unknown error:', error)
   return NextResponse.json(
     { error: 'Internal server error' },
     { status: 500 }

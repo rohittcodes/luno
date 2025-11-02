@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress'
 import { format } from 'date-fns'
 import { Plus, Trash2, Edit, Target, TrendingUp, TrendingDown } from 'lucide-react'
+import { formatCurrencyClient, getLocaleFromCurrency } from '@/lib/utils/currency'
+import { toast } from 'sonner'
 import { CardGridSkeleton } from '@/components/skeletons/card-skeleton'
 import type { Database } from '@/types/database'
 
@@ -30,6 +32,8 @@ export default function BudgetsPage() {
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [userCurrency, setUserCurrency] = useState<string>('USD')
+  const [userLocale, setUserLocale] = useState<string>('en-US')
 
   useEffect(() => {
     loadData()
@@ -73,6 +77,18 @@ export default function BudgetsPage() {
 
       if (transactionsError) throw transactionsError
 
+      // Load user currency preference
+      const { data: profileData } = await supabase
+        .from('users_profile')
+        .select('currency_preference')
+        .eq('id', user.id)
+        .single()
+
+      const currency = profileData?.currency_preference || 'USD'
+      const locale = getLocaleFromCurrency(currency)
+      setUserCurrency(currency)
+      setUserLocale(locale)
+
       setBudgets(budgetsData || [])
       setCategories(categoriesData || [])
       setTransactions(transactionsData || [])
@@ -94,7 +110,7 @@ export default function BudgetsPage() {
       await loadData()
     } catch (error) {
       console.error('Error deleting budget:', error)
-      alert('Failed to delete budget')
+      toast.error('Failed to delete budget')
     }
   }
 
@@ -226,10 +242,11 @@ function BudgetCard({
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm text-muted-foreground">Budget</span>
             <span className="font-semibold">
-              {new Intl.NumberFormat('en-IN', {
-                style: 'currency',
-                currency: budget.currency || 'INR',
-              }).format(Number(budget.amount))}
+              {formatCurrencyClient(
+                Number(budget.amount),
+                budget.currency || userCurrency,
+                budget.currency ? getLocaleFromCurrency(budget.currency) : userLocale
+              )}
             </span>
           </div>
           <div className="flex justify-between items-center mb-2">
@@ -239,10 +256,11 @@ function BudgetCard({
                 progress.isOverBudget ? 'text-red-600' : 'text-gray-900'
               }`}
             >
-              {new Intl.NumberFormat('en-IN', {
-                style: 'currency',
-                currency: budget.currency || 'INR',
-              }).format(progress.spent)}
+              {formatCurrencyClient(
+                progress.spent,
+                budget.currency || userCurrency,
+                budget.currency ? getLocaleFromCurrency(budget.currency) : userLocale
+              )}
             </span>
           </div>
           <Progress
@@ -263,19 +281,21 @@ function BudgetCard({
               {progress.remaining < 0 ? (
                 <>
                   <TrendingUp className="h-4 w-4" />
-                  {Math.abs(progress.remaining).toLocaleString('en-IN', {
-                    style: 'currency',
-                    currency: budget.currency || 'INR',
-                  })}{' '}
+                  {formatCurrencyClient(
+                    Math.abs(progress.remaining),
+                    budget.currency || userCurrency,
+                    budget.currency ? getLocaleFromCurrency(budget.currency) : userLocale
+                  )}{' '}
                   over
                 </>
               ) : (
                 <>
                   <TrendingDown className="h-4 w-4" />
-                  {progress.remaining.toLocaleString('en-IN', {
-                    style: 'currency',
-                    currency: budget.currency || 'INR',
-                  })}
+                  {formatCurrencyClient(
+                    progress.remaining,
+                    budget.currency || userCurrency,
+                    budget.currency ? getLocaleFromCurrency(budget.currency) : userLocale
+                  )}
                 </>
               )}
             </span>
@@ -311,13 +331,38 @@ function BudgetDialog({
     name: '',
     category_id: '',
     amount: '',
-    currency: 'INR',
+    currency: 'USD',
     period: 'monthly' as 'monthly' | 'yearly' | 'custom',
     start_date: new Date(),
     end_date: new Date(),
   })
+  
+  const [userCurrency, setUserCurrency] = useState<string>('USD')
 
   const supabase = createClientBrowser()
+
+  useEffect(() => {
+    async function loadUserCurrency() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      
+      if (user) {
+        const { data: profileData } = await supabase
+          .from('users_profile')
+          .select('currency_preference')
+          .eq('id', user.id)
+          .single()
+
+        const currency = profileData?.currency_preference || 'USD'
+        setUserCurrency(currency)
+      }
+    }
+
+    if (open) {
+      loadUserCurrency()
+    }
+  }, [open])
 
   useEffect(() => {
     if (editingId && open) {
@@ -342,7 +387,7 @@ function BudgetDialog({
           name: '', // Budgets don't have a name field
           category_id: budget.category_id || '',
           amount: budget.amount?.toString() || '',
-          currency: 'INR', // Budgets don't store currency
+          currency: userCurrency, // Budgets don't store currency
           period: 'custom', // Can enhance to detect period type
           start_date: new Date(budget.start_date),
           end_date: new Date(budget.end_date || budget.start_date),
@@ -362,7 +407,7 @@ function BudgetDialog({
       name: '',
       category_id: '',
       amount: '',
-      currency: 'INR',
+      currency: userCurrency,
       period: 'monthly',
       start_date: startOfMonth,
       end_date: endOfMonth,
@@ -433,7 +478,7 @@ function BudgetDialog({
       resetForm()
     } catch (error: any) {
       console.error('Error saving budget:', error)
-      alert(error.message || 'Failed to save budget')
+      toast.error(error.message || 'Failed to save budget')
     } finally {
       setLoading(false)
     }
@@ -474,16 +519,16 @@ function BudgetDialog({
             <div className="space-y-2">
               <Label htmlFor="category">Category (Optional)</Label>
               <Select
-                value={formData.category_id}
+                value={formData.category_id || 'none'}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, category_id: value })
+                  setFormData({ ...formData, category_id: value === 'none' ? '' : value })
                 }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="none">All Categories</SelectItem>
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}

@@ -13,6 +13,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { format } from 'date-fns'
 import { CalendarIcon, Plus, Trash2, Edit } from 'lucide-react'
+import { toast } from 'sonner'
 import { CardGridSkeleton } from '@/components/skeletons/card-skeleton'
 import type { Database } from '@/types/database'
 
@@ -59,7 +60,7 @@ export default function SubscriptionsPage() {
       await loadSubscriptions()
     } catch (error) {
       console.error('Error deleting subscription:', error)
-      alert('Failed to delete subscription')
+      toast.error('Failed to delete subscription')
     }
   }
 
@@ -331,7 +332,7 @@ function SubscriptionDialog({
       resetForm()
     } catch (error) {
       console.error('Error saving subscription:', error)
-      alert('Failed to save subscription')
+      toast.error('Failed to save subscription')
     } finally {
       setLoading(false)
     }

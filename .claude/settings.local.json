@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_dev-toolkit_rube__RUBE_SEARCH_TOOLS",
+      "mcp__plugin_dev-toolkit_rube__RUBE_MULTI_EXECUTE_TOOL",
+      "mcp__plugin_dev-toolkit_rube__RUBE_REMOTE_BASH_TOOL",
+      "mcp__plugin_dev-toolkit_rube__RUBE_REMOTE_WORKBENCH"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

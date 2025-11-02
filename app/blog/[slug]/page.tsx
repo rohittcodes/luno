@@ -7,6 +7,7 @@ import { LandingNav } from '@/components/landing/nav'
 import { Calendar, ArrowLeft } from 'lucide-react'
 import { format } from 'date-fns'
 import { getBlogPosts, getBlogPost } from '@/lib/blog/posts'
+import DOMPurify from 'isomorphic-dompurify'
 
 export async function generateStaticParams() {
   const posts = await getBlogPosts()
@@ -74,8 +75,13 @@ export default async function BlogPostPage({
           {/* Post Content */}
           <Card>
             <CardContent className="pt-8 prose prose-lg dark:prose-invert max-w-none">
-              <div 
-                dangerouslySetInnerHTML={{ __html: post.content }} 
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(post.content, {
+                    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'code', 'pre', 'img'],
+                    ALLOWED_ATTR: ['href', 'title', 'target', 'rel', 'src', 'alt', 'class']
+                  })
+                }}
               />
             </CardContent>
           </Card>

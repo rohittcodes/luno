@@ -3,6 +3,8 @@
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -46,24 +48,26 @@ export function Chatbot() {
       api: '/api/chat',
       fetch: async (url, options) => {
         const currentModel = modelRef.current
+        const body = options?.body 
+          ? JSON.parse(options.body as string)
+          : { messages: [] }
+        
+        // Merge model info into the request body
+        const modifiedBody = {
+          ...body,
+          modelId: currentModel.id,
+          provider: currentModel.provider,
+        }
+        
         const response = await fetch(url, {
           ...options,
-          body: options?.body
-            ? JSON.stringify({
-                ...JSON.parse(options.body as string),
-                modelId: currentModel.id,
-                provider: currentModel.provider,
-              })
-            : JSON.stringify({
-                messages: [],
-                modelId: currentModel.id,
-                provider: currentModel.provider,
-              }),
+          body: JSON.stringify(modifiedBody),
           headers: {
             ...(options?.headers as Record<string, string>),
             'Content-Type': 'application/json',
           },
         })
+        
         return response
       },
     }),
@@ -74,6 +78,7 @@ export function Chatbot() {
   
   const { messages, status, sendMessage, error } = chat
   const isLoading = status === 'submitted' || status === 'streaming'
+  
 
   if (!isOpen) {
     return (
@@ -135,7 +140,7 @@ export function Chatbot() {
 
       {!isMinimized && (
         <>
-          <CardContent className="flex flex-col p-0 h-[calc(600px-65px)]">
+          <CardContent className="flex flex-col p-0 h-[calc(600px-100px)]">
             <ScrollArea className="flex-1 px-4 py-4 min-h-0">
               <div className="space-y-4">
                 {messages.length === 0 && (
@@ -173,13 +178,191 @@ export function Chatbot() {
                           : 'bg-muted'
                       )}
                     >
-                      <div className="text-sm whitespace-pre-wrap">
-                        {message.parts?.map((part: any, idx: number) => {
-                          if (part.type === 'text') {
-                            return <span key={idx}>{part.text}</span>
+                      <div className="text-sm wrap-break-word prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-headings:my-2">
+                        {/* AI SDK v5 message format: check parts first (most common), then content */}
+                        {(() => {
+                          // Handle tool invocations for multi-step tool calling
+                          // AI SDK v5 includes tool invocations in message.parts
+                          if (message.role === 'assistant' && Array.isArray(message.parts)) {
+                            return (
+                              <div className="space-y-2">
+                                {message.parts.map((part: any, index: number) => {
+                                  // Handle text parts
+                                  if (part.type === 'text' && part.text) {
+                                    return (
+                                      <ReactMarkdown
+                                        key={`text-${index}`}
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                          ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+                                          ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+                                          li: ({ children }) => <li className="mb-1">{children}</li>,
+                                          code: ({ className, children, ...props }) => {
+                                            const isInline = !className
+                                            return isInline ? (
+                                              <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                                                {children}
+                                              </code>
+                                            ) : (
+                                              <code className={cn("block bg-muted p-2 rounded text-xs font-mono overflow-x-auto", className)} {...props}>
+                                                {children}
+                                              </code>
+                                            )
+                                          },
+                                          pre: ({ children }) => (
+                                            <pre className="bg-muted p-2 rounded text-xs font-mono overflow-x-auto mb-2">
+                                              {children}
+                                            </pre>
+                                          ),
+                                          h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-4 first:mt-0">{children}</h1>,
+                                          h2: ({ children }) => <h2 className="text-base font-bold mb-2 mt-4 first:mt-0">{children}</h2>,
+                                          h3: ({ children }) => <h3 className="text-sm font-bold mb-2 mt-4 first:mt-0">{children}</h3>,
+                                          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                                          em: ({ children }) => <em className="italic">{children}</em>,
+                                          blockquote: ({ children }) => (
+                                            <blockquote className="border-l-4 border-muted-foreground pl-3 italic my-2">
+                                              {children}
+                                            </blockquote>
+                                          ),
+                                          a: ({ href, children }) => (
+                                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                                              {children}
+                                            </a>
+                                          ),
+                                        }}
+                                      >
+                                        {part.text}
+                                      </ReactMarkdown>
+                                    )
+                                  }
+                                  
+                                  // Handle tool invocation parts (for multi-step tool calling)
+                                  if (part.type?.startsWith('tool-') || part.toolName) {
+                                    const toolName = part.toolName || part.type?.replace('tool-', '') || 'unknown'
+                                    const state = part.state || 'pending'
+                                    const isExecuting = state === 'call' || state === 'result'
+                                    
+                                    return (
+                                      <div key={`tool-${index}`} className="bg-muted/50 rounded p-2 text-xs">
+                                        <div className="flex items-center gap-2">
+                                          <div className={cn(
+                                            "h-2 w-2 rounded-full",
+                                            isExecuting ? "bg-yellow-500 animate-pulse" : "bg-green-500"
+                                          )} />
+                                          <span className="font-mono font-semibold">{toolName}</span>
+                                          <span className="text-muted-foreground">
+                                            {state === 'call' ? 'executing...' : state === 'result' ? 'completed' : 'pending'}
+                                          </span>
+                                        </div>
+                                        {part.result && (
+                                          <div className="mt-1 text-muted-foreground">
+                                            {typeof part.result === 'string' 
+                                              ? part.result.substring(0, 100) + (part.result.length > 100 ? '...' : '')
+                                              : JSON.stringify(part.result).substring(0, 100)}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  }
+                                  
+                                  return null
+                                })}
+                              </div>
+                            )
                           }
+                          
+                          // Fallback: Extract text content from message (legacy format)
+                          let textContent = ''
+                          
+                          // Try parts array first (useChat with DefaultChatTransport uses parts)
+                          if (Array.isArray(message.parts) && message.parts.length > 0) {
+                            textContent = message.parts
+                              .map((part: any) => {
+                                // Handle text parts
+                                if (part.type === 'text' && part.text) {
+                                  return part.text
+                                }
+                                // Handle plain string in parts
+                                if (typeof part === 'string') {
+                                  return part
+                                }
+                                // Handle parts with content property
+                                if (part.content) {
+                                  return part.content
+                                }
+                                return ''
+                              })
+                              .filter(Boolean)
+                              .join('')
+                          } else if (message.parts?.[0]?.type === 'text' && message.parts?.[0]?.text?.trim()) {
+                            textContent = message.parts[0].text.trim()
+                          } else if (typeof (message as any).content === 'string') {
+                            textContent = (message as any).content
+                          }
+                          
+                          // Render markdown for assistant messages, plain text for user messages
+                          if (textContent) {
+                            if (message.role === 'assistant') {
+                              return (
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
+                                  components={{
+                                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                    ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+                                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+                                    li: ({ children }) => <li className="mb-1">{children}</li>,
+                                    code: ({ className, children, ...props }) => {
+                                      const isInline = !className
+                                      return isInline ? (
+                                        <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                                          {children}
+                                        </code>
+                                      ) : (
+                                        <code className={cn("block bg-muted p-2 rounded text-xs font-mono overflow-x-auto", className)} {...props}>
+                                          {children}
+                                        </code>
+                                      )
+                                    },
+                                    pre: ({ children }) => (
+                                      <pre className="bg-muted p-2 rounded text-xs font-mono overflow-x-auto mb-2">
+                                        {children}
+                                      </pre>
+                                    ),
+                                    h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-4 first:mt-0">{children}</h1>,
+                                    h2: ({ children }) => <h2 className="text-base font-bold mb-2 mt-4 first:mt-0">{children}</h2>,
+                                    h3: ({ children }) => <h3 className="text-sm font-bold mb-2 mt-4 first:mt-0">{children}</h3>,
+                                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                                    em: ({ children }) => <em className="italic">{children}</em>,
+                                    blockquote: ({ children }) => (
+                                      <blockquote className="border-l-4 border-muted-foreground pl-3 italic my-2">
+                                        {children}
+                                      </blockquote>
+                                    ),
+                                    a: ({ href, children }) => (
+                                      <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                                        {children}
+                                      </a>
+                                    ),
+                                  }}
+                                >
+                                  {textContent}
+                                </ReactMarkdown>
+                              )
+                            } else {
+                              // User messages: plain text (no markdown)
+                              return <span className="whitespace-pre-wrap">{textContent}</span>
+                            }
+                          }
+                          
+                          // Loading state for assistant messages
+                          if (message.role === 'assistant') {
+                            return <span className="text-muted-foreground italic">Loading...</span>
+                          }
+                          
+                          // No content
                           return null
-                        }) || <span>No content</span>}
+                        })()}
                       </div>
                     </div>
 
