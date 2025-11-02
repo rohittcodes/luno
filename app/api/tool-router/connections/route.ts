@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
         connectionId: z.string().optional(),
         entityId: z.string(),
         entityName: z.string(),
-        credentials: z.record(z.any()).optional(),
-        metadata: z.record(z.any()).optional(),
+        credentials: z.record(z.string(), z.any()).optional(),
+        metadata: z.record(z.string(), z.any()).optional(),
       }),
     })
 

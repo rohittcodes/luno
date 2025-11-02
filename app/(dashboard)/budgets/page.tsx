@@ -191,6 +191,8 @@ export default function BudgetsPage() {
                   setEditingId(budget.id)
                   setIsDialogOpen(true)
                 }}
+                userCurrency={userCurrency}
+                userLocale={userLocale}
               />
             )
           })}
@@ -205,11 +207,15 @@ function BudgetCard({
   progress,
   onDelete,
   onEdit,
+  userCurrency,
+  userLocale,
 }: {
   budget: Budget & { categories?: Category | null }
   progress: { spent: number; remaining: number; percentage: number; isOverBudget: boolean }
   onDelete: (id: string) => void
   onEdit: () => void
+  userCurrency: string
+  userLocale: string
 }) {
   return (
     <Card>

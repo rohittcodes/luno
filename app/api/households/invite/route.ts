@@ -30,9 +30,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is the creator or has owner/admin role
+    // Fetch both created_by and name in one query
     const { data: householdData } = await supabase
       .from('households')
-      .select('created_by')
+      .select('created_by, name')
       .eq('id', householdId)
       .single()
 
@@ -89,15 +90,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     const inviterName = inviterProfile?.full_name || inviterProfile?.email || user.email || 'Someone'
-
-    // Get household name
-    const { data: householdData } = await supabase
-      .from('households')
-      .select('name')
-      .eq('id', householdId)
-      .single()
-
-    const householdName = householdData?.name || 'a household'
+    const householdName = householdData.name || 'a household'
 
     // Create invitation record
     const { data: invitation, error: inviteError } = await supabase

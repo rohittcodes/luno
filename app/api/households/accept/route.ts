@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if invitation is expired
-    if (new Date(invitation.expires_at) < new Date()) {
+    if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
       // Update invitation status to expired
       await supabase
         .from('household_invitations')
