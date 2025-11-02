@@ -416,7 +416,7 @@ function AccountDialog({
                   setFormData({ ...formData, type: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className='w-full'>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -437,7 +437,7 @@ function AccountDialog({
                   setFormData({ ...formData, currency: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className='w-full'>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

@@ -245,7 +245,7 @@ export default function GoalsPage() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="name">Goal Name</Label>
                 <Input
                   id="name"
@@ -256,8 +256,8 @@ export default function GoalsPage() {
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="target_amount">Target Amount</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="target_amount">Target Amount *</Label>
                   <Input
                     id="target_amount"
                     type="number"
@@ -268,8 +268,8 @@ export default function GoalsPage() {
                     required
                   />
                 </div>
-                <div>
-                  <Label htmlFor="current_amount">Current Amount</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="current_amount">Current Amount *</Label>
                   <Input
                     id="current_amount"
                     type="number"
@@ -280,7 +280,7 @@ export default function GoalsPage() {
                   />
                 </div>
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="deadline">Deadline (Optional)</Label>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -306,13 +306,13 @@ export default function GoalsPage() {
                   </PopoverContent>
                 </Popover>
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="category_id">Category (Optional)</Label>
                 <Select
                   value={formData.category_id || 'none'}
                   onValueChange={(value) => setFormData({ ...formData, category_id: value === 'none' ? '' : value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className='w-full'>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -325,7 +325,7 @@ export default function GoalsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
                 <Select
                   value={formData.status}
@@ -333,7 +333,7 @@ export default function GoalsPage() {
                     setFormData({ ...formData, status: value })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className='w-full'>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

@@ -526,7 +526,7 @@ function TransactionDialog({
                   setFormData({ ...formData, type: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className='w-full'>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -562,7 +562,7 @@ function TransactionDialog({
                   setFormData({ ...formData, account_id: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className='w-full'>
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
@@ -583,7 +583,7 @@ function TransactionDialog({
                   setFormData({ ...formData, category_id: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className='w-full'>
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -635,7 +635,7 @@ function TransactionDialog({
                   setFormData({ ...formData, currency: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className='w-full'>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

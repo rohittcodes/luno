@@ -524,7 +524,7 @@ function BudgetDialog({
                   setFormData({ ...formData, category_id: value === 'none' ? '' : value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className='w-full'>
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -546,7 +546,7 @@ function BudgetDialog({
                   setFormData({ ...formData, period: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className='w-full'>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -582,7 +582,7 @@ function BudgetDialog({
                   setFormData({ ...formData, currency: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className='w-full'>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

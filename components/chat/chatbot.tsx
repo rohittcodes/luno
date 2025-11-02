@@ -86,9 +86,9 @@ export function Chatbot() {
         <Button
           onClick={() => setIsOpen(true)}
           size="lg"
-          className="h-14 w-14 rounded-full shadow-lg"
+          className="h-14 w-14 rounded-xl shadow-lg"
         >
-          <Bot className="h-6 w-6" />
+          <Bot size={40} />
         </Button>
       </div>
     )

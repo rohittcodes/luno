@@ -12,6 +12,7 @@ import { Plus, Trash2, Edit, Folder, FolderTree } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Database } from '@/types/database'
 import { ListSkeleton } from '@/components/skeletons/list-skeleton'
+import { Select, SelectItem, SelectContent, SelectValue, SelectTrigger } from '@/components/ui/select'
 
 type Category = Database['public']['Tables']['categories']['Row'] & {
   description?: string | null
@@ -382,37 +383,42 @@ function CategoryDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="type">Type *</Label>
-              <select
-                id="type"
+              <Select
                 value={formData.type}
-                onChange={(e) =>
-                  setFormData({ ...formData, type: e.target.value as 'income' | 'expense' })
+                onValueChange={(value: 'income' | 'expense') =>
+                  setFormData({ ...formData, type: value as 'income' | 'expense' })
                 }
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                required
               >
-                <option value="expense">Expense</option>
-                <option value="income">Income</option>
-              </select>
+                <SelectTrigger className='w-full'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expense">Expense</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="parent">Parent Category (Optional)</Label>
-              <select
-                id="parent"
-                value={formData.parent_id}
-                onChange={(e) =>
-                  setFormData({ ...formData, parent_id: e.target.value })
+              <Select
+                value={formData.parent_id || "none"}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, parent_id: value === "none" ? "" : value })
                 }
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
               >
-                <option value="">None (Root Category)</option>
-                {parentOptions.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="None (Root Category)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Root Category)</SelectItem>
+                  {parentOptions.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

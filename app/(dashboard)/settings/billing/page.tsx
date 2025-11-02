@@ -12,6 +12,7 @@ import { CardSkeleton } from '@/components/skeletons/card-skeleton'
 export default function BillingPage() {
   const [subscription, setSubscription] = useState<any>(null)
   const [limits, setLimits] = useState<any>(null)
+  const [usage, setUsage] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,11 +21,17 @@ export default function BillingPage() {
 
   async function loadSubscriptionData() {
     try {
-      const response = await fetch('/api/subscription')
-      const { subscription, limits } = await response.json()
+      const [subscriptionResponse, usageResponse] = await Promise.all([
+        fetch('/api/subscription'),
+        fetch('/api/usage'),
+      ])
 
-      setSubscription(subscription)
-      setLimits(limits)
+      const subscriptionData = await subscriptionResponse.json()
+      const usageData = await usageResponse.json()
+
+      setSubscription(subscriptionData.subscription)
+      setLimits(subscriptionData.limits)
+      setUsage(usageData)
     } catch (error) {
       console.error('Error loading subscription:', error)
     } finally {
@@ -164,32 +171,32 @@ export default function BillingPage() {
           <CardContent className="space-y-4">
             <FeatureLimitRow
               feature="Transactions"
-              current={limits.transactions_limit === -1 ? '∞' : 'Check usage'}
+              current={limits.transactions_limit === -1 ? '∞' : (usage?.transactions ?? 0).toString()}
               limit={limits.transactions_limit === -1 ? 'Unlimited' : limits.transactions_limit.toString()}
               isUnlimited={limits.transactions_limit === -1}
             />
             <FeatureLimitRow
               feature="Categories"
-              current={limits.categories_limit === -1 ? '∞' : 'Check usage'}
+              current={limits.categories_limit === -1 ? '∞' : (usage?.categories ?? 0).toString()}
               limit={limits.categories_limit === -1 ? 'Unlimited' : limits.categories_limit.toString()}
               isUnlimited={limits.categories_limit === -1}
             />
             <FeatureLimitRow
               feature="Bank Connections"
-              current={limits.bank_connections_limit === -1 ? '∞' : 'Check usage'}
+              current={limits.bank_connections_limit === -1 ? '∞' : (usage?.bankConnections ?? 0).toString()}
               limit={limits.bank_connections_limit === -1 ? 'Unlimited' : limits.bank_connections_limit.toString()}
               isUnlimited={limits.bank_connections_limit === -1}
             />
             <FeatureLimitRow
               feature="Receipt Scans"
-              current={limits.receipt_scans_limit === -1 ? '∞' : 'Check usage'}
+              current={limits.receipt_scans_limit === -1 ? '∞' : (usage?.receiptScans ?? 0).toString()}
               limit={limits.receipt_scans_limit === -1 ? 'Unlimited' : limits.receipt_scans_limit.toString()}
               isUnlimited={limits.receipt_scans_limit === -1}
             />
             {isFamily && (
               <FeatureLimitRow
                 feature="Family Members"
-                current={limits.family_members_limit === -1 ? '∞' : 'Check usage'}
+                current={limits.family_members_limit === -1 ? '∞' : (usage?.familyMembers ?? 0).toString()}
                 limit={limits.family_members_limit === -1 ? 'Unlimited' : limits.family_members_limit.toString()}
                 isUnlimited={limits.family_members_limit === -1}
               />

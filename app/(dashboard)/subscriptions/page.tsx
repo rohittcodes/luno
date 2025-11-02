@@ -375,7 +375,7 @@ function SubscriptionDialog({
                 setFormData({ ...formData, type: value })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className='w-full'>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -409,7 +409,7 @@ function SubscriptionDialog({
                   setFormData({ ...formData, currency: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className='w-full'>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -460,7 +460,7 @@ function SubscriptionDialog({
                   setFormData({ ...formData, renewal_frequency: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className='w-full'>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

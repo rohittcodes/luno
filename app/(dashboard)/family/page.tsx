@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { createClientBrowser } from '@/lib/supabase/browser-client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Users, UserPlus, Crown, Mail, Calendar } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageSkeleton } from '@/components/skeletons/page-skeleton'
+import { useSubscription } from '@/lib/hooks/queries/use-subscription'
 import type { Database } from '@/types/database'
 
 type Household = Database['public']['Tables']['households']['Row']
@@ -27,6 +29,8 @@ export default function FamilyPage() {
   const [loading, setLoading] = useState(true)
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
+
+  const { data: subscriptionData } = useSubscription()
 
   useEffect(() => {
     loadHouseholdData()
@@ -79,14 +83,21 @@ export default function FamilyPage() {
     }
   }
 
-  async function createHousehold() {
-    try {
+  const createHouseholdMutation = useMutation({
+    mutationFn: async () => {
       const supabase = createClientBrowser()
       const {
         data: { user },
       } = await supabase.auth.getUser()
 
-      if (!user) return
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+
+      // Check if user has family sharing feature (Family plan required)
+      if (subscriptionData?.subscription?.plan_type !== 'family') {
+        throw new Error('Family sharing is only available on the Family plan. Please upgrade to create a household.')
+      }
 
       // TypeScript doesn't know about households table in Database type
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,52 +110,99 @@ export default function FamilyPage() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error creating household:', error)
+        throw error
+      }
 
       // Add owner as member
       // TypeScript doesn't know about household_members table in Database type
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const membersTable = supabase.from('household_members') as any
       const household = data as Household
-      await membersTable.insert({
+      const { error: memberError } = await membersTable.insert({
         household_id: household.id,
         user_id: user.id,
         role: 'owner',
       })
 
+      if (memberError) {
+        console.error('Supabase error adding member:', memberError)
+        throw memberError
+      }
+
+      return household
+    },
+    onSuccess: () => {
       toast.success('Household created successfully')
       loadHouseholdData()
-    } catch (error: any) {
+    },
+    onError: (error: any) => {
       console.error('Error creating household:', error)
-      toast.error(error.message || 'Failed to create household')
-    }
+      
+      // Extract error message from various possible formats
+      let errorMessage = 'Failed to create household'
+      if (error?.message) {
+        errorMessage = error.message
+      } else if (error?.error_description) {
+        errorMessage = error.error_description
+      } else if (error?.hint) {
+        errorMessage = error.hint
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error) {
+        errorMessage = JSON.stringify(error)
+      }
+      
+      toast.error(errorMessage)
+    },
+  })
+
+  function createHousehold() {
+    createHouseholdMutation.mutate()
   }
+
+  const sendInviteMutation = useMutation({
+    mutationFn: async (email: string) => {
+      if (!household) throw new Error('No household selected')
+
+      const response = await fetch('/api/households/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          householdId: household.id,
+          email,
+          role: 'member',
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to send invitation')
+      }
+
+      return response.json()
+    },
+    onSuccess: (data, email) => {
+      setIsInviteDialogOpen(false)
+      setInviteEmail('')
+      if (data.emailSent) {
+        toast.success(`Invitation sent to ${email}`)
+      } else {
+        toast.success(`Invitation created for ${email}, but email could not be sent`)
+      }
+    },
+    onError: (error: Error) => {
+      console.error('Error sending invite:', error)
+      toast.error(error.message || 'Failed to send invitation')
+    },
+  })
 
   async function sendInvite() {
     if (!inviteEmail || !household) return
-
-    try {
-      const supabase = createClientBrowser()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) return
-
-      // In a real implementation, this would send an email invite
-      // For now, we'll create a pending member record
-      toast.info('Invite feature will send email invitations to join the household')
-      
-      // TODO: Implement email invitation via Resend
-      // await sendInviteEmail(inviteEmail, household.id, user.id)
-      
-      setIsInviteDialogOpen(false)
-      setInviteEmail('')
-      toast.success(`Invitation will be sent to ${inviteEmail}`)
-    } catch (error: any) {
-      console.error('Error sending invite:', error)
-      toast.error(error.message || 'Failed to send invitation')
-    }
+    sendInviteMutation.mutate(inviteEmail)
   }
 
   async function removeMember(memberId: string) {
