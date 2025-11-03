@@ -311,7 +311,7 @@ function CategoryDialog({
         user_id: user.id,
         name: formData.name,
         description: formData.description || null,
-        parent_id: formData.parent_id || null,
+        parent_category_id: formData.parent_id || null,
         type: formData.type,
         icon: formData.icon || null,
         color: formData.color || null,
