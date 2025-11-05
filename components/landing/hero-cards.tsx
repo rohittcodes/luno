@@ -2,7 +2,7 @@
 
 import { Card } from '@/components/ui/card'
 import { CreditCard, TrendingUp, Wallet } from 'lucide-react'
-import { useState, useRef, type ComponentType } from 'react'
+import { useState, type ComponentType } from 'react'
 
 type TrendDetail = { type: 'trend'; text: string }
 type ProgressDetail = { type: 'progress'; spent: number; total: number }
@@ -48,106 +48,25 @@ const cards: CardItem[] = [
 ]
 
 export function HeroCards() {
-  const [cardOrder, setCardOrder] = useState([0, 1, 2])
-  const [draggedCard, setDraggedCard] = useState<number | null>(null)
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
-  const dragStartPos = useRef({ x: 0, y: 0 })
+  const [cardOrder] = useState([0, 1, 2])
 
-  const handleDragStart = (e: React.MouseEvent | React.TouchEvent, index: number) => {
-    if (index !== cardOrder[2]) return // Only allow dragging top card
-
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
-
-    dragStartPos.current = { x: clientX, y: clientY }
-    setDraggedCard(index)
-  }
-
-  const handleDrag = (e: React.MouseEvent | React.TouchEvent) => {
-    if (draggedCard === null) return
-
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
-
-    const deltaX = clientX - dragStartPos.current.x
-    const deltaY = clientY - dragStartPos.current.y
-
-    setDragOffset({ x: deltaX, y: deltaY })
-  }
-
-  const handleDragEnd = () => {
-    if (draggedCard === null) return
-
-    const threshold = 100
-
-    if (Math.abs(dragOffset.x) > threshold || Math.abs(dragOffset.y) > threshold) {
-      // Card swiped - move to back
-      setCardOrder(prev => {
-        const newOrder = [...prev]
-        const topCard = newOrder.pop()!
-        newOrder.unshift(topCard)
-        return newOrder
-      })
-    }
-
-    setDraggedCard(null)
-    setDragOffset({ x: 0, y: 0 })
-  }
-
-  const getCardStyle = (index: number) => {
+  const getCardClasses = (index: number) => {
     const orderIndex = cardOrder.indexOf(index)
-    const isTop = orderIndex === 2
-    const isMiddle = orderIndex === 1
-    const isBottom = orderIndex === 0
-
-    if (isTop && draggedCard === index) {
-      const rotation = dragOffset.x / 20
-      return {
-        transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) rotate(${rotation}deg)`,
-        zIndex: 30,
-        opacity: 1,
-        scale: 1,
-        transition: 'none'
-      }
-    }
-
-    if (isTop) {
-      return { zIndex: 30, opacity: 1, scale: 1, y: 0 }
-    }
-    if (isMiddle) {
-      return { zIndex: 20, opacity: 0.85, scale: 0.94, y: 24 }
-    }
-    if (isBottom) {
-      return { zIndex: 10, opacity: 0.7, scale: 0.88, y: 48 }
-    }
-    return {}
+    if (orderIndex === 2) return 'z-30 opacity-100 scale-100 translate-y-0'
+    if (orderIndex === 1) return 'z-20 opacity-85 scale-95 translate-y-6'
+    if (orderIndex === 0) return 'z-10 opacity-70 scale-90 translate-y-12'
+    return ''
   }
 
   return (
     <div className="relative w-full max-w-md mx-auto h-[350px] sm:h-[380px]">
       {cards.map((card, index) => {
-        const style = getCardStyle(index)
         const Icon = card.icon
         const orderIndex = cardOrder.indexOf(index)
-
         return (
           <div
             key={card.id}
-            className="absolute inset-x-0 mx-auto w-full cursor-grab active:cursor-grabbing"
-            style={{
-              zIndex: style.zIndex,
-              opacity: style.opacity,
-              transform: style.transform || `translateY(${style.y}px) scale(${style.scale})`,
-              transition: style.transition || 'all 0.3s ease-out',
-              pointerEvents: orderIndex === 2 ? 'auto' : 'none'
-            }}
-            onMouseDown={(e) => handleDragStart(e, index)}
-            onMouseMove={handleDrag}
-            onMouseUp={handleDragEnd}
-            onMouseLeave={handleDragEnd}
-            onTouchStart={(e) => handleDragStart(e, index)}
-            onTouchMove={handleDrag}
-            onTouchEnd={handleDragEnd}
+            className={`absolute inset-x-0 mx-auto w-full transition-all duration-300 ease-out ${getCardClasses(index)} ${orderIndex === 2 ? 'pointer-events-auto' : 'pointer-events-none'}`}
           >
             <Card className="relative w-full h-[280px] sm:h-[300px] rounded-[2rem] border-2 shadow-2xl overflow-hidden bg-card">
               <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-90`} />
@@ -183,10 +102,7 @@ export function HeroCards() {
                       <span className="font-semibold">${card.detail.spent.toLocaleString()}</span>
                     </div>
                     <div className="w-full h-2 bg-white/30 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-white rounded-full"
-                        style={{ width: `${(card.detail.spent / card.detail.total) * 100}%` }}
-                      />
+                      <div className="h-full bg-white rounded-full w-[66%]" />
                     </div>
                   </div>
                 )}
