@@ -2,9 +2,24 @@
 
 import { Card } from '@/components/ui/card'
 import { CreditCard, TrendingUp, Wallet } from 'lucide-react'
-import { useState, useRef } from 'react'
+import { useState, useRef, type ComponentType } from 'react'
 
-const cards = [
+type TrendDetail = { type: 'trend'; text: string }
+type ProgressDetail = { type: 'progress'; spent: number; total: number }
+type MembersDetail = { type: 'members'; avatars: string[] }
+type CardDetail = TrendDetail | ProgressDetail | MembersDetail
+
+type CardItem = {
+  id: number
+  title: string
+  value: string
+  subtitle?: string
+  icon: ComponentType<any> | null
+  detail: CardDetail
+  gradient: string
+}
+
+const cards: CardItem[] = [
   {
     id: 1,
     title: 'Total Balance',
