@@ -22,14 +22,6 @@ type CardItem = {
 const cards: CardItem[] = [
   {
     id: 1,
-    title: 'Total Balance',
-    value: '$12,450',
-    icon: Wallet,
-    detail: { type: 'trend', text: '+12.5% this month' },
-    gradient: 'from-primary/90 to-primary'
-  },
-  {
-    id: 2,
     title: 'Monthly Budget',
     value: '$3,200',
     icon: CreditCard,
@@ -37,14 +29,22 @@ const cards: CardItem[] = [
     gradient: 'from-primary to-primary/80'
   },
   {
-    id: 3,
+    id: 2,
     title: 'Active Goals',
     value: '3',
     subtitle: 'On track to save $15,000',
     icon: null,
     detail: { type: 'members', avatars: ['V', 'H', 'E'] },
     gradient: 'from-primary/80 to-primary/60'
-  }
+  },
+  {
+    id: 3,
+    title: 'Total Balance',
+    value: '$12,450',
+    icon: Wallet,
+    detail: { type: 'trend', text: '+12.5% this month' },
+    gradient: 'from-primary/90 to-primary'
+  },
 ]
 
 export function HeroCards() {
@@ -115,10 +115,10 @@ export function HeroCards() {
       return { zIndex: 30, opacity: 1, scale: 1, y: 0 }
     }
     if (isMiddle) {
-      return { zIndex: 20, opacity: 0.8, scale: 0.95, y: 10 }
+      return { zIndex: 20, opacity: 0.85, scale: 0.94, y: 24 }
     }
     if (isBottom) {
-      return { zIndex: 10, opacity: 0.6, scale: 0.9, y: 20 }
+      return { zIndex: 10, opacity: 0.7, scale: 0.88, y: 48 }
     }
     return {}
   }
